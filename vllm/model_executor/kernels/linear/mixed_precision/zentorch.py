@@ -12,6 +12,7 @@ import torch
 from vllm import envs
 from vllm.logger import init_logger
 from vllm.model_executor.kernels.linear.zentorch_utils import has_zentorch_op
+from vllm.model_executor.utils import replace_parameter
 from vllm.platforms import current_platform
 from vllm.scalar_type import scalar_types
 
@@ -166,9 +167,7 @@ class ZentorchWNA16LinearKernel(CPUWNA16LinearKernel):
         layer._zentorch_da8w4_scale = weight_scale.t().to(torch.bfloat16).contiguous()
 
         for param_name in (self.w_q_name, self.w_s_name):
-            param = getattr(layer, param_name, None)
-            if param is not None and hasattr(param, "data"):
-                param.data = torch.empty(0)
+            replace_parameter(layer, param_name, torch.empty(0))
 
         layer._zentorch_kind = "compressed_tensors_w4a8_da8w4"
         layer._zentorch_da8w4 = True
@@ -256,15 +255,8 @@ class ZentorchWNA16LinearKernel(CPUWNA16LinearKernel):
         layer._zentorch_woq_zero_point = zp_tc
 
         for param_name in (self.w_q_name, self.w_s_name, self.w_zp_name):
-            if param_name is None:
-                continue
-            param = getattr(layer, param_name, None)
-            if param is None:
-                continue
-            if hasattr(param, "data"):
-                param.data = torch.empty(0)
-            else:
-                setattr(layer, param_name, torch.empty(0))
+            if param_name is not None:
+                replace_parameter(layer, param_name, torch.empty(0))
 
         layer._zentorch_kind = "compressed_tensors_w4a16_gptq"
         layer._zentorch_processed_weights = True
